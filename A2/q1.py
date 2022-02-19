@@ -40,6 +40,7 @@ class Controller1(app_manager.RyuApp):
 
 	@set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
 	def switch_features_handler(self, ev):
+		priority= 0
 		#Process switch connection 
 		datapath = ev.msg.datapath
 		self.switches[datapath.id] = datapath
@@ -50,8 +51,7 @@ class Controller1(app_manager.RyuApp):
 		match = parser.OFPMatch()	
 		actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
 						  				  ofproto.OFPCML_NO_BUFFER)]
-			
-		self.add_flow(datapath, 0, match, actions)
+		self.add_flow(datapath, priority, match, actions)
 
 
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
@@ -76,47 +76,55 @@ class Controller1(app_manager.RyuApp):
 		if dst in self.net:
 			src_id = list(self.net[src].keys())[0]
 			dst_id = list(self.net[dst].keys())[0]
-			if not((src_id%2 and dst_id%2) or not(src_id% 2 or dst_id%2)):
-				# install a firewall rule in the ingress switch 
-				print('block')
-				actions = []
+
+			# NOTE : As it was mentioned that we do not need to send the packet out
+			# therefore when we do the pingall for the first time it sets up all the routes 
+			# but the pingall itself (for the first time) does not work. Once all the 
+			# routes are setup and we run pingall again, everything works as intented.
+
+			if nx.has_path(self.net, src, dst):
+				#-----------------------------------------------------------
+				# STEP 1: - compute shortest path between src and dst
+				#-----------------------------------------------------------
+				path = nx.shortest_path(self.net, src, dst)[1:-1]
 				match = parser.OFPMatch(eth_dst=dst, eth_src= src)	
-				self.add_flow(datapath, 1, match, actions)
-			elif nx.has_path(self.net, src, dst):
-				# shortest path computation
-				path = nx.shortest_path(self.net, src, dst)
-				for idx, switch in enumerate(path):
-					if(switch == dpid):
-						# install a routing rule for every switch in the path
-						print('Switch: ', self.net[switch])
-						port = self.net[switch][path[idx+1]]['port']
-						if idx == 1 or idx == len(path)-2:
-							
-							actions = [parser.OFPActionOutput(port), parser.OFPActionOutput(1)]
-						else:
-							actions = [parser.OFPActionOutput(port)]
-						match = parser.OFPMatch(eth_dst=dst)	
-						self.add_flow(datapath, 1, match, actions)
+
+				#------------------------------------------------------------------------
+				# STEP 2: - install a routing rule for every switch in the path
+				#------------------------------------------------------------------------
+			
+				for switch_id in path:
+					idx =  path.index(switch_id)
+					priority= 1
+					datapath_curr = self.switches[switch_id]
+					if  idx == len(path)-1:
+						port = self.net[switch_id][dst]['port']
+					else:
+						port = self.net[switch_id][path[idx+1]]['port']
+					actions = [parser.OFPActionOutput(port)]
+					self.add_flow(datapath_curr, priority, match, actions)
+			#------------------------------------------------------------------------
+			# STEP 3: - install a firewall rule in the ingress switch (i.e., 
+			#                first switch in the path), if needed
+			#------------------------------------------------------------------------
+			if not((src_id%2 and dst_id%2) or not(src_id% 2 or dst_id%2)):
+				actions = []
+				priority= 2
+				match = parser.OFPMatch(eth_dst=dst, eth_src= src)	
+				self.add_flow(datapath, priority, match, actions)
 
 	def add_flow(self, datapath, priority, match, actions):
-		ofproto = datapath.ofproto
-		parser = datapath.ofproto_parser
+			ofproto = datapath.ofproto
+			parser = datapath.ofproto_parser
 
-		inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
-						     actions)]
+			inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
+								actions)]
 
-		mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-					match=match, instructions=inst)
+			mod = parser.OFPFlowMod(datapath=datapath, priority=priority
+						, match=match, 
+						instructions=inst)
 
-		datapath.send_msg(mod)
-
-
-
-
-
-
-
-
+			datapath.send_msg(mod)
 
 
 
