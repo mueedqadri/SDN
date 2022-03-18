@@ -16,7 +16,7 @@ def handle_pkt(pkt):
 
 
 def main():
-    iface = 'veth4'
+    iface = 'veth0'
     print "sniffing on %s" % iface
     sys.stdout.flush()
     sniff(iface = iface,

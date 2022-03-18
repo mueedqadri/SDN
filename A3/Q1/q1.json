@@ -4,7 +4,8 @@
       "name" : "scalars_0",
       "id" : 0,
       "fields" : [
-        ["prev_ts_0", 48, false]
+        ["tmp", 1, false],
+        ["_padding_0", 7, false]
       ]
     },
     {
@@ -63,33 +64,13 @@
       ]
     },
     {
-      "name" : "tcp_t",
+      "name" : "udp_t",
       "id" : 4,
       "fields" : [
         ["srcPort", 16, false],
         ["dstPort", 16, false],
-        ["seqNo", 32, false],
-        ["ackNo", 32, false],
-        ["dataOffset", 4, false],
-        ["res", 4, false],
-        ["cwr", 1, false],
-        ["ece", 1, false],
-        ["urg", 1, false],
-        ["ack", 1, false],
-        ["psh", 1, false],
-        ["rst", 1, false],
-        ["syn", 1, false],
-        ["fin", 1, false],
-        ["window", 16, false],
-        ["checksum", 16, false],
-        ["urgentPtr", 16, false]
-      ]
-    },
-    {
-      "name" : "ts_t",
-      "id" : 5,
-      "fields" : [
-        ["time_since_last_packet", 48, false]
+        ["length_", 16, false],
+        ["checksum", 16, false]
       ]
     }
   ],
@@ -123,16 +104,9 @@
       "pi_omit" : true
     },
     {
-      "name" : "tcp",
+      "name" : "udp",
       "id" : 4,
-      "header_type" : "tcp_t",
-      "metadata" : false,
-      "pi_omit" : true
-    },
-    {
-      "name" : "ts",
-      "id" : 5,
-      "header_type" : "ts_t",
+      "header_type" : "udp_t",
       "metadata" : false,
       "pi_omit" : true
     }
@@ -184,7 +158,7 @@
               "parameters" : [
                 {
                   "type" : "regular",
-                  "value" : "tcp"
+                  "value" : "udp"
                 }
               ],
               "op" : "extract"
@@ -208,37 +182,24 @@
       "name" : "deparser",
       "id" : 0,
       "source_info" : {
-        "filename" : "q2.p4",
-        "line" : 195,
+        "filename" : "q1.p4",
+        "line" : 184,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
-      "order" : ["ethernet", "ipv4", "tcp", "ts"]
+      "order" : ["ethernet", "ipv4", "udp"]
     }
   ],
   "meter_arrays" : [],
   "counter_arrays" : [],
-  "register_arrays" : [
-    {
-      "name" : "MyIngress.prev_packet_ts",
-      "id" : 0,
-      "source_info" : {
-        "filename" : "q2.p4",
-        "line" : 120,
-        "column" : 27,
-        "source_fragment" : "prev_packet_ts"
-      },
-      "size" : 1,
-      "bitwidth" : 48
-    }
-  ],
+  "register_arrays" : [],
   "calculations" : [
     {
       "name" : "calc",
       "id" : 0,
       "source_info" : {
-        "filename" : "q2.p4",
-        "line" : 173,
+        "filename" : "q1.p4",
+        "line" : 162,
         "column" : 8,
         "source_fragment" : "update_checksum( ..."
       },
@@ -300,8 +261,14 @@
       "primitives" : []
     },
     {
-      "name" : "MyIngress.drop",
+      "name" : "NoAction",
       "id" : 1,
+      "runtime_data" : [],
+      "primitives" : []
+    },
+    {
+      "name" : "MyIngress.drop",
+      "id" : 2,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -313,8 +280,8 @@
             }
           ],
           "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 124,
+            "filename" : "q1.p4",
+            "line" : 100,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -322,8 +289,8 @@
       ]
     },
     {
-      "name" : "MyIngress.ipv4_forward",
-      "id" : 2,
+      "name" : "MyIngress.forward",
+      "id" : 3,
       "runtime_data" : [
         {
           "name" : "port",
@@ -344,8 +311,8 @@
             }
           ],
           "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 128,
+            "filename" : "q1.p4",
+            "line" : 104,
             "column" : 2,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -354,111 +321,61 @@
     },
     {
       "name" : "act",
-      "id" : 3,
+      "id" : 4,
       "runtime_data" : [],
       "primitives" : [
-        {
-          "op" : "register_read",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "prev_ts_0"]
-            },
-            {
-              "type" : "register_array",
-              "value" : "MyIngress.prev_packet_ts"
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x00000000"
-            }
-          ],
-          "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 148,
-            "column" : 12,
-            "source_fragment" : "prev_packet_ts.read(prev_ts, 0)"
-          }
-        },
-        {
-          "op" : "add_header",
-          "parameters" : [
-            {
-              "type" : "header",
-              "value" : "ts"
-            }
-          ],
-          "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 149,
-            "column" : 12,
-            "source_fragment" : "hdr.ts.setValid()"
-          }
-        },
         {
           "op" : "assign",
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["ts", "time_since_last_packet"]
+              "value" : ["scalars", "tmp"]
             },
             {
               "type" : "expression",
               "value" : {
                 "type" : "expression",
                 "value" : {
-                  "op" : "&",
-                  "left" : {
-                    "type" : "expression",
-                    "value" : {
-                      "op" : "-",
-                      "left" : {
-                        "type" : "field",
-                        "value" : ["standard_metadata", "ingress_global_timestamp"]
-                      },
-                      "right" : {
-                        "type" : "field",
-                        "value" : ["scalars", "prev_ts_0"]
-                      }
-                    }
-                  },
+                  "op" : "b2d",
+                  "left" : null,
                   "right" : {
-                    "type" : "hexstr",
-                    "value" : "0xffffffffffff"
+                    "type" : "bool",
+                    "value" : true
                   }
                 }
               }
             }
-          ],
-          "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 150,
-            "column" : 12,
-            "source_fragment" : "hdr.ts.time_since_last_packet = standard_metadata.ingress_global_timestamp - prev_ts"
-          }
-        },
+          ]
+        }
+      ]
+    },
+    {
+      "name" : "act_0",
+      "id" : 5,
+      "runtime_data" : [],
+      "primitives" : [
         {
-          "op" : "register_write",
+          "op" : "assign",
           "parameters" : [
             {
-              "type" : "register_array",
-              "value" : "MyIngress.prev_packet_ts"
-            },
-            {
-              "type" : "hexstr",
-              "value" : "0x00000000"
-            },
-            {
               "type" : "field",
-              "value" : ["standard_metadata", "ingress_global_timestamp"]
+              "value" : ["scalars", "tmp"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "b2d",
+                  "left" : null,
+                  "right" : {
+                    "type" : "bool",
+                    "value" : false
+                  }
+                }
+              }
             }
-          ],
-          "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 151,
-            "column" : 12,
-            "source_fragment" : "prev_packet_ts.write(0, standard_metadata.ingress_global_timestamp)"
-          }
+          ]
         }
       ]
     }
@@ -468,23 +385,41 @@
       "name" : "ingress",
       "id" : 0,
       "source_info" : {
-        "filename" : "q2.p4",
-        "line" : 116,
+        "filename" : "q1.p4",
+        "line" : 96,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
       "init_table" : "node_2",
       "tables" : [
         {
-          "name" : "MyIngress.ipv4_lpm",
+          "name" : "MyIngress.firewall",
           "id" : 0,
           "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 131,
+            "filename" : "q1.p4",
+            "line" : 107,
             "column" : 10,
-            "source_fragment" : "ipv4_lpm"
+            "source_fragment" : "firewall"
           },
           "key" : [
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ethernet.srcAddr",
+              "target" : ["ethernet", "srcAddr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ethernet.dstAddr",
+              "target" : ["ethernet", "dstAddr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ipv4.srcAddr",
+              "target" : ["ipv4", "srcAddr"],
+              "mask" : null
+            },
             {
               "match_type" : "exact",
               "name" : "hdr.ipv4.dstAddr",
@@ -498,13 +433,12 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [1, 2, 0],
-          "actions" : ["MyIngress.drop", "MyIngress.ipv4_forward", "NoAction"],
-          "base_default_next" : "tbl_act",
+          "action_ids" : [2, 0],
+          "actions" : ["MyIngress.drop", "NoAction"],
+          "base_default_next" : null,
           "next_tables" : {
-            "MyIngress.drop" : "tbl_act",
-            "MyIngress.ipv4_forward" : "tbl_act",
-            "NoAction" : "tbl_act"
+            "__HIT__" : "tbl_act",
+            "__MISS__" : "tbl_act_0"
           },
           "default_entry" : {
             "action_id" : 0,
@@ -516,12 +450,6 @@
         {
           "name" : "tbl_act",
           "id" : 1,
-          "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 148,
-            "column" : 12,
-            "source_fragment" : "prev_packet_ts.read(prev_ts, 0); ..."
-          },
           "key" : [],
           "match_type" : "exact",
           "type" : "simple",
@@ -529,17 +457,95 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [3],
+          "action_ids" : [4],
           "actions" : ["act"],
-          "base_default_next" : null,
+          "base_default_next" : "node_6",
           "next_tables" : {
-            "act" : null
+            "act" : "node_6"
           },
           "default_entry" : {
-            "action_id" : 3,
+            "action_id" : 4,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_act_0",
+          "id" : 2,
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [5],
+          "actions" : ["act_0"],
+          "base_default_next" : "node_6",
+          "next_tables" : {
+            "act_0" : "node_6"
+          },
+          "default_entry" : {
+            "action_id" : 5,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "MyIngress.route",
+          "id" : 3,
+          "source_info" : {
+            "filename" : "q1.p4",
+            "line" : 122,
+            "column" : 10,
+            "source_fragment" : "route"
+          },
+          "key" : [
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ethernet.srcAddr",
+              "target" : ["ethernet", "srcAddr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ethernet.dstAddr",
+              "target" : ["ethernet", "dstAddr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ipv4.srcAddr",
+              "target" : ["ipv4", "srcAddr"],
+              "mask" : null
+            },
+            {
+              "match_type" : "exact",
+              "name" : "hdr.ipv4.dstAddr",
+              "target" : ["ipv4", "dstAddr"],
+              "mask" : null
+            }
+          ],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 10,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [3, 1],
+          "actions" : ["MyIngress.forward", "NoAction"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "MyIngress.forward" : null,
+            "NoAction" : null
+          },
+          "default_entry" : {
+            "action_id" : 1,
+            "action_const" : false,
+            "action_data" : [],
+            "action_entry_const" : false
           }
         }
       ],
@@ -549,8 +555,8 @@
           "name" : "node_2",
           "id" : 0,
           "source_info" : {
-            "filename" : "q2.p4",
-            "line" : 145,
+            "filename" : "q1.p4",
+            "line" : 138,
             "column" : 12,
             "source_fragment" : "hdr.ipv4.isValid()"
           },
@@ -566,7 +572,37 @@
             }
           },
           "false_next" : null,
-          "true_next" : "MyIngress.ipv4_lpm"
+          "true_next" : "MyIngress.firewall"
+        },
+        {
+          "name" : "node_6",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "q1.p4",
+            "line" : 139,
+            "column" : 15,
+            "source_fragment" : "!firewall.apply().hit"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "not",
+              "left" : null,
+              "right" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "d2b",
+                  "left" : null,
+                  "right" : {
+                    "type" : "field",
+                    "value" : ["scalars", "tmp"]
+                  }
+                }
+              }
+            }
+          },
+          "false_next" : null,
+          "true_next" : "MyIngress.route"
         }
       ]
     },
@@ -574,8 +610,8 @@
       "name" : "egress",
       "id" : 1,
       "source_info" : {
-        "filename" : "q2.p4",
-        "line" : 161,
+        "filename" : "q1.p4",
+        "line" : 150,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
@@ -590,8 +626,8 @@
       "name" : "cksum",
       "id" : 0,
       "source_info" : {
-        "filename" : "q2.p4",
-        "line" : 173,
+        "filename" : "q1.p4",
+        "line" : 162,
         "column" : 8,
         "source_fragment" : "update_checksum( ..."
       },
@@ -661,7 +697,7 @@
       ["standard_metadata", "recirculate_flag"]
     ]
   ],
-  "program" : "./q2.p4i",
+  "program" : "./q1.p4i",
   "__meta__" : {
     "version" : [2, 18],
     "compiler" : "https://github.com/p4lang/p4c"

@@ -2,8 +2,7 @@
 #include <core.p4>
 #include <v1model.p4>
 
-const bit<16> TYPE_IPV4  = 0x800;
-const bit<16> TYPE_PROBE = 0x812;
+const bit<16> TYPE_IPV4 = 0x800;
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -34,29 +33,11 @@ header ipv4_t {
     ip4Addr_t dstAddr;
 }
 
-header tcp_t{
+header udp_t {
     bit<16> srcPort;
     bit<16> dstPort;
-    bit<32> seqNo;
-    bit<32> ackNo;
-    bit<4>  dataOffset;
-    bit<4>  res;
-    bit<1>  cwr;
-    bit<1>  ece;
-    bit<1>  urg;
-    bit<1>  ack;
-    bit<1>  psh;
-    bit<1>  rst;
-    bit<1>  syn;
-    bit<1>  fin;
-    bit<16> window;
+    bit<16> length_;
     bit<16> checksum;
-    bit<16> urgentPtr;
-}
-
-header ts_t {
-
-    bit<48> time_since_last_packet;
 }
 
 struct metadata {
@@ -66,8 +47,7 @@ struct metadata {
 struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
-    tcp_t        tcp;
-    ts_t         ts;
+    udp_t		 udp;
 }
 
 /*************************************************************************
@@ -90,13 +70,13 @@ parser MyParser(packet_in packet,
 
 	state parse_ipv4 {
 		packet.extract(hdr.ipv4);
-        transition parse_tcp;
+		transition parse_udp;
 	}
 
-    state parse_tcp {
-       packet.extract(hdr.tcp);
-        transition accept;
-    }
+    state parse_udp {
+		packet.extract(hdr.udp);
+		transition accept;
+	}
 
 }
 
@@ -116,26 +96,39 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
-
-    register <bit<48>> (1) prev_packet_ts;
-    bit<48> prev_ts;
-
     action drop() {
         mark_to_drop(standard_metadata);
     }
 
-    action ipv4_forward(egressSpec_t port) {
+    action forward(egressSpec_t port) {
 		standard_metadata.egress_spec = port;
     }
 
-    table ipv4_lpm {
+    table firewall {
 		key = {
+            hdr.ethernet.srcAddr : exact;
+            hdr.ethernet.dstAddr : exact;
+			hdr.ipv4.srcAddr : exact;
 			hdr.ipv4.dstAddr : exact;
 		}
 
 		actions = {
 			drop;
-			ipv4_forward;
+		}
+
+		size = 10;
+    }
+
+    table route {
+		key = {
+            hdr.ethernet.srcAddr : exact;
+            hdr.ethernet.dstAddr : exact;
+			hdr.ipv4.srcAddr : exact;
+			hdr.ipv4.dstAddr : exact;
+		}
+
+		actions = {
+			forward;
 		}
 
 		size = 10;
@@ -143,14 +136,10 @@ control MyIngress(inout headers hdr,
 
     apply {
         if (hdr.ipv4.isValid()) {
-            ipv4_lpm.apply();
-
-            prev_packet_ts.read(prev_ts, 0);
-            hdr.ts.setValid();
-            hdr.ts.time_since_last_packet = standard_metadata.ingress_global_timestamp - prev_ts;
-            prev_packet_ts.write(0, standard_metadata.ingress_global_timestamp);
+            if(!firewall.apply().hit){
+                route.apply();
+            }
         }
-
     }
 }
 
@@ -196,9 +185,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
 		packet.emit(hdr.ethernet);
 		packet.emit(hdr.ipv4);
-        packet.emit(hdr.tcp);
-        packet.emit(hdr.ts);
-
+		packet.emit(hdr.udp);
     }
 }
 

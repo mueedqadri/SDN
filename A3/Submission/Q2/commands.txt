@@ -1,0 +1,1 @@
+table_add ipv4_lpm ipv4_forward 10.0.0.2 => 2
