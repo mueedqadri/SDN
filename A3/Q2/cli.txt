@@ -1,0 +1,3 @@
+p4c --target bmv2 --arch v1model q2.p4
+sudo simple_switch -i 1@veth0 -i 2@veth2 --log-console --thrift-port 9090 q2.json
+sudo simple_switch_CLI --thrift-port 9090
