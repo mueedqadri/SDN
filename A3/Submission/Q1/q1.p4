@@ -136,6 +136,7 @@ control MyIngress(inout headers hdr,
 
     apply {
         if (hdr.ipv4.isValid()) {
+			// If only the firewall table is NOT hit forward the packet 
             if(!firewall.apply().hit){
                 route.apply();
             }

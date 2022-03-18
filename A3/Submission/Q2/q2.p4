@@ -54,8 +54,8 @@ header tcp_t{
     bit<16> urgentPtr;
 }
 
+//Create Custom Header for TimeStamp (ts)
 header ts_t {
-
     bit<48> time_since_last_packet;
 }
 
@@ -116,7 +116,7 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
-
+	// Define register and a temp var
     register <bit<48>> (1) prev_packet_ts;
     bit<48> prev_ts;
 
@@ -144,12 +144,12 @@ control MyIngress(inout headers hdr,
     apply {
         if (hdr.ipv4.isValid()) {
             ipv4_lpm.apply();
-
-            prev_packet_ts.read(prev_ts, 0);
-            hdr.ts.setValid();
-            hdr.ts.time_since_last_packet = standard_metadata.ingress_global_timestamp - prev_ts;
-            prev_packet_ts.write(0, standard_metadata.ingress_global_timestamp);
         }
+		//Calculate the time elapsed since last packet
+		prev_packet_ts.read(prev_ts, 0);
+        hdr.ts.setValid();
+        hdr.ts.time_since_last_packet = standard_metadata.ingress_global_timestamp - prev_ts;
+        prev_packet_ts.write(0, standard_metadata.ingress_global_timestamp);
 
     }
 }
@@ -197,6 +197,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
 		packet.emit(hdr.ethernet);
 		packet.emit(hdr.ipv4);
         packet.emit(hdr.tcp);
+		//Emit the header
         packet.emit(hdr.ts);
 
     }

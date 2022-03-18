@@ -29,7 +29,7 @@ Step 4 Send Packets:
 
 Step 1 Compile: 
 
-    p4c --target bmv2 --arch v1model q1.p4
+    p4c --target bmv2 --arch v1model q2.p4
 
 
 Step 2 Run: 
